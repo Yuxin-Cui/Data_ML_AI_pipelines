@@ -1,0 +1,67 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+# Set up the environment. 
+Sys.setenv(JAVA_HOME = "D:\\Programs\\java") 
+
+# Load necessary libraries
+library(dplyr)          
+library(xgboost)        
+library(data.table)
+library(tidymodels)    
+library(h2o)            
+set.seed(123)            
+
+# Load the data
+data_raw <- fread("data.csv")  
+data <- data_raw[, -1]  # remove unneeded variables      
+data$diagnosis <- as.factor(data$diagnosis)  
+
+# Set the target variable
+target <- "diagnosis"
+
+# Initialize the H2O instance 
+h2o.init(max_mem_size = "4G", nthreads = -1)  
+
+# Convert the data to H2O frame
+data_h2o <- as.h2o(data)
+
+# Split the data into training and testing sets 
+split <- h2o.splitFrame(data_h2o, ratios = 0.7, destination_frames = c('train', 'test'), seed = 1)
+train <- split[[1]]
+test <- split[[2]]
+
+# Run H2O AutoML to automatically train and tune a variety of models
+aml <- h2o.automl(
+  y = target,             
+  training_frame = train,  
+  max_models = 10,   
+  )
+
+# View the leaderboard (models and performance metrics)
+leaderboard <- aml@leaderboard
+print(leaderboard)
+
+# Get the best model based on leaderboard performance
+best_model <- aml@leader
+print(best_model)
+
+# Make predictions with the best model on the test dataset
+pred_test <- h2o.predict(best_model, test)
+
+# Evaluate the performance of the best model on the test set
+perf <- h2o.performance(best_model, newdata = test)
+print(perf)
+
+# Shut down the H2O instance to release resources
+h2o.shutdown(prompt = FALSE)
+
+# Optional: Inspect the first few rows of predictions
+# h2o.head(pred_test)
+
+```
+
